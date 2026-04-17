@@ -1,0 +1,408 @@
+---
+title: "Homework 4: Simulation-Based Inference"
+author: "Student Name"
+date: April 10, 2026
+output: html_document
+---
+
+```{r setup, include=FALSE}
+set.seed(702)
+knitr::opts_chunk$set(
+  echo = TRUE, message = FALSE, warning = FALSE,
+  fig.width = 8, fig.height = 5
+)
+```
+
+### I want problem 1 graded.
+
+# [45pt] Problem 1: Idle Current Draws
+
+A hardware team measures idle current (mA) for one design (A), and also runs a smaller comparison with another design (B). Assume independence across units.
+
+We'll use a synthetic dataset (generated below) so everyone gets the same numbers:
+
+```{r}
+# DO NOT CHANGE CODE IN THIS CHUNK
+set.seed(702)
+
+# Simulated "observed" data for Design A
+n_A <- 36 # number of samples for design A
+true_mu_A <- 10.2
+true_sd_A <- 0.7
+A <- rnorm(n_A, mean = true_mu_A, sd = true_sd_A)
+
+# Design B (for the two-sample part)
+n_B <- 28 # number of samples for design B
+true_mu_B <- 10.5 # slightly different mean
+true_sd_B <- 0.7
+B <- rnorm(n_B, mean = true_mu_B, sd = true_sd_B)
+
+c(mean_A = mean(A), sd_A = sd(A), n_A = length(A),
+  mean_B = mean(B), sd_B = sd(B), n_B = length(B))
+```
+
+### [10pt] Part A — Construct a sampling distribution
+
+Specifications claim the mean idle current is $\mu_0=10$ mA, so we are interested in the null hypothesis $H_0: \mu=10$mA. Construct the null sampling distribution of $\bar{X}$ with $B=10000$ blocks. Assume idle current draws are normally distributed with known $\sigma=0.7$ and $n=36$. Plot the sampling distribution as a histogram with the observed statistic as a red vertical line. Finally, comment on your graphic.
+
+#### Solution:
+
+Under $H_0$, $\bar{X} \sim N(\mu_0 = 10, \sigma/\sqrt{n} = 0.7/\sqrt{36})$. We simulate 10,000 sample means of size $n=36$ drawn from this null model.
+
+```{r}
+set.seed(702)
+nsim <- 10000
+n     <- 36
+sigma <- 0.7
+mu0   <- 10
+
+null_means_1 <- replicate(nsim, mean(rnorm(n, mean = mu0, sd = sigma)))
+obs_mean_A   <- mean(A)
+obs_mean_A
+
+hist(null_means_1, breaks = 40, col = "lightblue",
+     main = expression("Null sampling distribution of " * bar(X)),
+     xlab = "Sample mean (mA)")
+abline(v = obs_mean_A, col = "red", lwd = 2)
+```
+
+The null sampling distribution is centered at $\mu_0 = 10$ mA, roughly symmetric and bell-shaped, as expected from the CLT. The observed sample mean for Design A lies well to the right of the bulk of the distribution, suggesting that a mean of 10 mA is unlikely given the data.
+
+### [5pt] Part B — Quantify Uncertainty
+
+Compute the standard error of your sampling distribution and the 95\% confidence interval. What do these measure?
+
+#### Solution:
+
+```{r}
+se_1 <- sd(null_means_1)
+ci_1 <- quantile(null_means_1, c(0.025, 0.975))
+se_1
+ci_1
+```
+
+The standard error (`r round(se_1, 4)`) measures the typical variability of sample means of size $n=36$ around $\mu_0=10$ under the null. The 95% interval gives the range in which we would expect the middle 95% of sample means to fall if the null were true. Since the observed mean `r round(obs_mean_A, 4)` lies outside this interval, it is a surprising outcome under $H_0$.
+
+### [15pt] Part C — Make a Decision Regarding $H_0$
+
+Consider the hypotheses:
+$$H_0: \mu=10 \text{ mA}, \quad \quad H_a:\mu>10 \text{ mA}.$$
+
+Decide whether to "reject" or "fail to reject" $H_0$ using (i) parametric simulation and (ii) one-sample bootstrapping (use $B=6000$ resamples). Use a 95\% confidence level.
+
+#### Solution:
+
+**(i) Parametric simulation.** Using the null sampling distribution from Part A, we compute a one-sided p-value as the fraction of null sample means at least as extreme as the observed mean.
+
+```{r}
+p_param_1 <- mean(null_means_1 >= obs_mean_A)
+p_param_1
+```
+
+**(ii) One-sample bootstrap.** We shift the data so its mean equals $\mu_0 = 10$ (so bootstrap resamples are consistent with $H_0$), then resample with replacement $B = 6000$ times and compute the fraction of bootstrapped means at least as large as the observed mean.
+
+```{r}
+set.seed(702)
+B_boot <- 6000
+A_shift <- A - mean(A) + mu0
+boot_means_1 <- replicate(B_boot, mean(sample(A_shift, length(A), replace = TRUE)))
+p_boot_1 <- mean(boot_means_1 >= obs_mean_A)
+p_boot_1
+```
+
+Both p-values are far below $\alpha = 0.05$, so we **reject $H_0$** under both methods. There is strong evidence that the true mean idle current for Design A exceeds 10 mA.
+
+### [15pt] Part D — Two-Sample Permutation Test
+
+Now, we want to know if the mean idle current differs between designs A and B. First, state the relevant hypotheses to test, then make a decision using the permutation test with $B=10000$ resamples. Assume a 90\% confidence level. Interpret your decision.
+
+#### Solution:
+
+We test
+$$H_0: \mu_A = \mu_B, \quad\quad H_a: \mu_A \neq \mu_B.$$
+
+Under $H_0$, the labels "A" and "B" are exchangeable. We pool the two samples, repeatedly shuffle the labels, and recompute the difference in means.
+
+```{r}
+set.seed(702)
+nperm <- 10000
+obs_diff_1 <- mean(A) - mean(B)
+obs_diff_1
+
+combined <- c(A, B)
+nA <- length(A); nB <- length(B)
+
+perm_diffs_1 <- replicate(nperm, {
+  sh <- sample(combined)
+  mean(sh[1:nA]) - mean(sh[(nA + 1):(nA + nB)])
+})
+
+p_perm_1 <- mean(abs(perm_diffs_1) >= abs(obs_diff_1))
+p_perm_1
+
+hist(perm_diffs_1, breaks = 40, col = "lightblue",
+     main = "Permutation distribution of mean difference (A - B)",
+     xlab = expression(bar(X)[A] - bar(X)[B]))
+abline(v = c(-1, 1) * abs(obs_diff_1), col = "red", lwd = 2)
+```
+
+The two-sided permutation p-value is `r round(p_perm_1, 4)`. At the 90% confidence level ($\alpha = 0.10$), we **reject $H_0$** if this p-value is below 0.10. The observed difference in means is unlikely to arise by label-shuffling alone, so we conclude the mean idle current differs between Designs A and B.
+
+---
+
+# [45pt] Problem 2: Spurs 3PT Shooting Accuracy
+
+We are interested in comparing the San Antonio Spurs' 3PT shooting accuracy with the league average and the Boston Celtics. Below, we simulate a dataset of Spurs and Celtics 3PT attempts. Note that accuracy is represented as a proportion of successful 3PT attempts.
+
+```{r}
+# DO NOT CHANGE ANYTHING IN THIS CODE BLOCK
+set.seed(512)
+
+## San Antonio Spurs data
+n_SAS <- 3246 # number of attempts 
+p_SAS_true <- 0.335 # true accuracy
+SAS <- rbinom(n_SAS, size = 1, prob = p_SAS_true) # binary "success" vector
+
+## Boston Celtics data
+n_OTH <- 3955 # number of attempts
+p_OTH_true <- 0.368 # true accuracy
+OTH <- rbinom(n_OTH, size = 1, prob = p_OTH_true) # binary "success" vector
+
+c(p_hat_SAS = mean(SAS), n_SAS = length(SAS),
+  p_hat_OTH = mean(OTH), n_OTH = length(OTH))
+```
+
+### [10pt] Part A — Construct a sampling distribution
+
+The league-wide 3PT shooting accuracy is $p_0=0.35$, so we are interested in the null hypothesis $H_0: \hat{p}=0.35$. Construct the null sampling distribution of $\hat{p}$ with $B=10000$ blocks. Assume each 3PT attempt is binomially distributed with $k=1$ trial (i.e., Bernoulli distributed). Plot the sampling distribution as a histogram with the observed statistic as a red vertical line. Finally, comment on your graphic.
+
+#### Solution:
+
+Under $H_0$, each attempt is Bernoulli($p_0 = 0.35$). We simulate 10,000 sample proportions of size $n_{SAS} = 3246$.
+
+```{r}
+set.seed(512)
+nsim  <- 10000
+n_SAS <- length(SAS)
+p0    <- 0.35
+
+null_phat_2 <- replicate(nsim, mean(rbinom(n_SAS, size = 1, prob = p0)))
+obs_phat_SAS <- mean(SAS)
+obs_phat_SAS
+
+hist(null_phat_2, breaks = 40, col = "lightblue",
+     main = expression("Null sampling distribution of " * hat(p)),
+     xlab = "Sample proportion")
+abline(v = obs_phat_SAS, col = "red", lwd = 2)
+```
+
+The null distribution of $\hat{p}$ is centered at 0.35 and approximately normal (the CLT applies since $n_{SAS}$ is large). The observed Spurs proportion lies in the lower tail, suggesting the Spurs may shoot worse than the league average.
+
+### [5pt] Part B — Quantify Uncertainty
+
+Compute the standard error of your sampling distribution and the 95\% confidence interval. What do these measure?
+
+#### Solution:
+
+```{r}
+se_2 <- sd(null_phat_2)
+ci_2 <- quantile(null_phat_2, c(0.025, 0.975))
+se_2
+ci_2
+```
+
+The standard error (`r round(se_2, 5)`) measures the spread of $\hat{p}$ across repeated samples of size $n_{SAS}$ under the null $p_0 = 0.35$. The 95% interval captures the central 95% of such simulated proportions. The observed Spurs proportion `r round(obs_phat_SAS, 4)` falls outside this interval, indicating it is unusual under $H_0$.
+
+### [15pt] Part C — Make a Decision Regarding $H_0$
+
+Consider the hypotheses:
+$$H_0: p=0.35, \quad \quad H_a: p<0.35.$$
+
+Decide whether to "reject" or "fail to reject" $H_0$ using (i) parametric simulation and (ii) one-sample bootstrapping (use $B=6000$ resamples). Use a 95\% confidence level. Comment on whether your decisions agree.
+
+#### Solution:
+
+**(i) Parametric simulation.** One-sided (lower-tail) p-value:
+
+```{r}
+p_param_2 <- mean(null_phat_2 <= obs_phat_SAS)
+p_param_2
+```
+
+**(ii) One-sample bootstrap.** To make resamples consistent with $H_0: p = 0.35$, we resample from a Bernoulli($p_0$) population (equivalently, from the observed vector after shifting; for binary data we just resample directly under the null probability). We then compute the lower-tail p-value.
+
+```{r}
+set.seed(512)
+B_boot <- 6000
+boot_phat_2 <- replicate(B_boot, mean(rbinom(n_SAS, size = 1, prob = p0)))
+p_boot_2 <- mean(boot_phat_2 <= obs_phat_SAS)
+p_boot_2
+```
+
+Both p-values are far below $\alpha = 0.05$, so we **reject $H_0$** in both cases. The two methods agree: there is strong evidence that the Spurs' true 3PT accuracy is below the league-average 0.35.
+
+### [15pt] Part D — Two-Sample Permutation Test
+
+Now, we want to know if 3PT accuracy differs between the San Antonio Spurs and the Boston Celtics. First, state the relevant hypotheses to test, then make a decision using the permutation test with $B=10000$ resamples. Assume a 90\% confidence level. Interpret your decision.
+
+#### Solution:
+
+We test
+$$H_0: p_{SAS} = p_{OTH}, \quad\quad H_a: p_{SAS} \neq p_{OTH}.$$
+
+```{r}
+set.seed(512)
+nperm <- 10000
+obs_diff_2 <- mean(SAS) - mean(OTH)
+obs_diff_2
+
+combined2 <- c(SAS, OTH)
+nS <- length(SAS); nO <- length(OTH)
+
+perm_diffs_2 <- replicate(nperm, {
+  sh <- sample(combined2)
+  mean(sh[1:nS]) - mean(sh[(nS + 1):(nS + nO)])
+})
+
+p_perm_2 <- mean(abs(perm_diffs_2) >= abs(obs_diff_2))
+p_perm_2
+
+hist(perm_diffs_2, breaks = 40, col = "lightblue",
+     main = "Permutation distribution (SAS - OTH)",
+     xlab = expression(hat(p)[SAS] - hat(p)[OTH]))
+abline(v = c(-1, 1) * abs(obs_diff_2), col = "red", lwd = 2)
+```
+
+The two-sided permutation p-value is `r round(p_perm_2, 4)`. Since this is below $\alpha = 0.10$, we **reject $H_0$**: there is strong evidence that the Spurs and Celtics differ in their true 3PT accuracy.
+
+---
+
+# [45pt] Problem 3: Resistor Batch Analysis
+
+A Quality Assurance (QA) team at a PCB assembly plant is verifying a batch of resistors labeled as 1kilo Ohms (1000 Ohms). They measure the actual resistance for the standard supplier (Batch A) and a new, cheaper supplier (Batch B).
+
+We'll use a synthetic dataset (generated below) so everyone gets the same numbers:
+
+```{r}
+#DO NOT CHANGE CODE IN THIS CHUNK
+set.seed(303)
+
+#Simulated "observed" data for Standard Supplier (Batch A)
+n_A <- 40 #number of resistors sampled
+true_mu_A <- 1005 #Actual mean
+true_sd_A <- 12 #Manufacturing tolerance sigma
+A <- rnorm(n_A, mean = true_mu_A, sd = true_sd_A)
+
+#New Supplier (Batch B)
+n_B <- 30 
+true_mu_B <- 1015 #Worse mean
+true_sd_B <- 15
+B <- rnorm(n_B, mean = true_mu_B, sd = true_sd_B)
+
+c(mean_A = mean(A), sd_A = sd(A), n_A = length(A),
+  mean_B = mean(B), sd_B = sd(B), n_B = length(B))
+```
+
+### [10pt] Part A — Construct a sampling distribution
+
+The manufacturer claims the resistors are centered exactly at the nominal value $\mu_0 = 1000 \Omega$. We are interested in the null hypothesis $H_0: \mu = 1000 \Omega$. Construct the null sampling distribution of $\bar{X}$ with $B=10,000$ iterations. Assume the resistance values are normally distributed with the known population standard deviation $\sigma=12 \Omega$ and sample size $n=40$. Plot the sampling distribution as a histogram with the observed sample mean from Batch A as a red vertical line. Comment on the graph.
+
+#### Solution:
+
+Under $H_0$, $\bar{X} \sim N(1000, 12/\sqrt{40})$. We simulate 10,000 null sample means.
+
+```{r}
+set.seed(303)
+nsim  <- 10000
+n_r   <- 40
+sigma_r <- 12
+mu0_r <- 1000
+
+null_means_3 <- replicate(nsim, mean(rnorm(n_r, mean = mu0_r, sd = sigma_r)))
+obs_mean_R <- mean(A)
+obs_mean_R
+
+hist(null_means_3, breaks = 40, col = "lightblue",
+     main = expression("Null sampling distribution of " * bar(X)),
+     xlab = expression("Sample mean resistance (" * Omega * ")"))
+abline(v = obs_mean_R, col = "red", lwd = 2)
+```
+
+The null distribution is centered at 1000 $\Omega$ and approximately normal. The observed Batch A sample mean lies clearly to the right of the bulk of the null distribution, suggesting resistors are running high.
+
+### [5pt] Part B — Quantify Uncertainty
+
+Compute the standard error of your sampling distribution and the 95\% confidence interval. What do these measure?
+
+#### Solution:
+
+```{r}
+se_3 <- sd(null_means_3)
+ci_3 <- quantile(null_means_3, c(0.025, 0.975))
+se_3
+ci_3
+```
+
+The standard error (`r round(se_3, 4)` $\Omega$) estimates the variability of sample means of size 40 under the null. The 95% interval shows where the middle 95% of such sample means would fall if $\mu = 1000$. Since the observed mean lies outside this interval, it is unusual under the null.
+
+### [15pt] Part C — Make a Decision Regarding $H_0$
+We suspect the resistors might be "running high" due to a material defect. Consider the hypotheses:
+$$H_0: \mu = 1000 \Omega, \quad \quad H_a: \mu > 1000 \Omega.$$
+Decide whether to "reject" or "fail to reject" $H_0$ using **(i) parametric simulation** and **(ii) one-sample bootstrapping** (use $B=6000$ resamples). Use a 95% confidence level.
+
+#### Solution:
+
+**(i) Parametric simulation.**
+
+```{r}
+p_param_3 <- mean(null_means_3 >= obs_mean_R)
+p_param_3
+```
+
+**(ii) One-sample bootstrap.** Shift Batch A so its mean equals $\mu_0 = 1000$, then resample with replacement.
+
+```{r}
+set.seed(303)
+B_boot <- 6000
+A_shift_r <- A - mean(A) + mu0_r
+boot_means_3 <- replicate(B_boot, mean(sample(A_shift_r, length(A), replace = TRUE)))
+p_boot_3 <- mean(boot_means_3 >= obs_mean_R)
+p_boot_3
+```
+
+Both p-values are below $\alpha = 0.05$, so we **reject $H_0$** under both methods. There is strong evidence that the true mean resistance of Batch A exceeds 1000 $\Omega$.
+
+### [15pt] Part D — Two-Sample Permutation Test
+Now, we want to know if the mean resistance differs between the Standard Supplier (Batch A) and the New Supplier (Batch B).
+
+First, state the relevant hypotheses to test, then make a decision using the **permutation test** with $B=10,000$ resamples. Assume a 90% confidence level. Interpret your decision.
+
+#### Solution:
+
+We test
+$$H_0: \mu_A = \mu_B, \quad\quad H_a: \mu_A \neq \mu_B.$$
+
+```{r}
+set.seed(303)
+nperm <- 10000
+obs_diff_3 <- mean(A) - mean(B)
+obs_diff_3
+
+combined3 <- c(A, B)
+nA3 <- length(A); nB3 <- length(B)
+
+perm_diffs_3 <- replicate(nperm, {
+  sh <- sample(combined3)
+  mean(sh[1:nA3]) - mean(sh[(nA3 + 1):(nA3 + nB3)])
+})
+
+p_perm_3 <- mean(abs(perm_diffs_3) >= abs(obs_diff_3))
+p_perm_3
+
+hist(perm_diffs_3, breaks = 40, col = "lightblue",
+     main = "Permutation distribution (Batch A - Batch B)",
+     xlab = expression(bar(X)[A] - bar(X)[B]))
+abline(v = c(-1, 1) * abs(obs_diff_3), col = "red", lwd = 2)
+```
+
+The two-sided permutation p-value is `r round(p_perm_3, 4)`. At the 90% confidence level ($\alpha = 0.10$), we **reject $H_0$** if this is below 0.10. The observed difference is unlikely under label-shuffling alone, so we conclude the mean resistance differs between the Standard Supplier (Batch A) and the New Supplier (Batch B).

@@ -1,0 +1,330 @@
+---
+title: "Homework 3"
+output:
+  html_document: default
+  pdf_document: default
+date: "2026-03-27"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Question 1
+Suppose that airplane engines operate independently and fail with probability equal to 0.4. Assuming that a plane makes a safe flight if at least one-half of its engines run, determine whether a 4-engine plane or a 2-engine plane has the higher probability for a successful flight. Compare probabilities.
+
+### Solution:
+
+We use the binomial distribution because this experiment follows the Bernoulli process.
+For a 4-engine plane, the probability that at least half of engines run is $$P(X\ge 2)=1-P(X\le 1).$$
+For a 2-engine plane, the probability that at least half of engines run is $$P(Y\ge 1)=1-P(Y=0).$$
+
+```{r}
+p=0.6 # probability of engine successfully working
+
+eng4_success = 1-pbinom(1,4,p)
+eng4_success
+
+eng2_success = 1-dbinom(0,2,p)
+eng2_success
+
+eng4_success > eng2_success
+```
+
+Therefore, the 2-engine plane has a higher probability for a successful flight.
+
+## Question 2
+An electronic switching device occasionally malfunctions, but the device is considered satisfactory if it makes, on average, no more than 0.20 errors per hour. A particular 5-hour period is chosen for testing the device. If no more than 1 error occurs during the time period, the device will be considered satisfactory.
+
+1. What is the probability that a satisfactory device with $\lambda=1$ will be considered unsatisfactory on the basis of the test?
+2. What is the probability that a device will be accepted as satisfactory when, in fact, the mean number of errors per hour is 0.25?
+
+### Solution:
+
+The number of errors follows a Poisson distribution. Over 5 hours, the expected number of errors is $\lambda t$.
+
+**Part 1:** A satisfactory device has $\lambda = 0.20$ errors/hour, so over 5 hours $\lambda t = 1$. The device is unsatisfactory if more than 1 error occurs: $P(X > 1) = 1 - P(X \le 1)$.
+
+**Part 2:** If $\lambda = 0.25$, then over 5 hours $\lambda t = 1.25$. The device is accepted if at most 1 error: $P(X \le 1)$.
+
+```{r}
+# Part 1: lambda*t = 0.20*5 = 1
+p_unsatisfactory = 1 - ppois(1, lambda = 1)
+p_unsatisfactory
+
+# Part 2: lambda*t = 0.25*5 = 1.25
+p_accepted = ppois(1, lambda = 1.25)
+p_accepted
+```
+
+## Question 3
+Find the probability of being dealt a hand of 13 cards containing 5 spades, 2 hearts, 3 diamonds, and 3 clubs.
+
+### Solution:
+
+This is a multivariate hypergeometric distribution. We choose 5 from 13 spades, 2 from 13 hearts, 3 from 13 diamonds, and 3 from 13 clubs, out of all ways to choose 13 from 52 cards.
+
+$$P = \frac{\binom{13}{5}\binom{13}{2}\binom{13}{3}\binom{13}{3}}{\binom{52}{13}}$$
+
+```{r}
+prob = choose(13,5) * choose(13,2) * choose(13,3) * choose(13,3) / choose(52,13)
+prob
+```
+
+## Question 4:
+A traffic control engineer reports that 75\% of the vehicles passing through a checkpoint are from Virginia. What is the probability that fewer than 4 of the next 9 vehicles are from out of state?
+
+### Solution:
+
+If 75% are from Virginia, then 25% are from out of state. Let $X$ be the number of out-of-state vehicles. $X \sim \text{Binomial}(n=9, p=0.25)$. We want $P(X < 4) = P(X \le 3)$.
+
+```{r}
+pbinom(3, 9, 0.25)
+```
+
+## Question 5
+An electronics firm claims that the proportion of defective units from a certain process is 5\%. A buyer has a standard procedure of inspecting 15 units selected randomly from a large lot. On a particular occasion, the buyer found 5 defective items.
+
+1. What is the probability of this occurrence given that the claim of 5\% defective is correct?
+2. Is this occurrence more likely if 60\% of the units are defective? Compare probabilities.
+3. Assuming the firm's claim is true, what is the probability that the third lot that the buyer inspects is the first lot to have fewer than 3 defective units?
+4. Assuming the firm's claim is true, what is the probability that the buyer requires less than 8 lots to find 2 lots with fewer than 3 defective units?
+
+### Solution:
+
+Let $X \sim \text{Binomial}(n=15, p)$ be the number of defective units in a sample.
+
+**Part 1:** $P(X=5)$ with $p=0.05$.
+
+**Part 2:** $P(X=5)$ with $p=0.60$. Compare.
+
+**Part 3:** Let $q = P(X < 3)$ with $p=0.05$. The number of lots until the first lot with fewer than 3 defectives follows a geometric distribution. We want $P(Y=3)$ where $Y \sim \text{Geometric}(q)$.
+
+**Part 4:** The number of lots until 2 lots with fewer than 3 defectives follows a negative binomial. We want $P(Y < 8)$ where $Y \sim \text{NegBin}(k=2, q)$.
+
+```{r}
+# Part 1
+p1 = dbinom(5, 15, 0.05)
+p1
+
+# Part 2
+p2 = dbinom(5, 15, 0.60)
+p2
+p2 > p1
+
+# Part 3: probability a lot has fewer than 3 defectives
+q = pbinom(2, 15, 0.05)
+q
+
+# P(third lot is first with < 3 defectives) = geometric with success prob q
+# P(Y=3) = (1-q)^2 * q
+p3 = dgeom(3-1, q)
+p3
+
+# Part 4: P(fewer than 8 lots to find 2 lots with < 3 defectives)
+# Y ~ NegBin(k=2, q), P(Y < 8) = P(Y <= 7)
+p4 = pnbinom(7-2, 2, q)
+p4
+```
+
+## Question 6
+A certain area of the eastern United States is, on average, hit by 6 hurricanes a year. Find the probability that, in a given year, that area will be hit by
+
+1. fewer than 4 hurricanes.
+2. anywhere from 6 to 8 hurricanes.
+
+### Solution:
+
+Let $X \sim \text{Poisson}(\lambda = 6)$.
+
+```{r}
+# Part 1: P(X < 4) = P(X <= 3)
+ppois(3, 6)
+
+# Part 2: P(6 <= X <= 8) = P(X <= 8) - P(X <= 5)
+ppois(8, 6) - ppois(5, 6)
+```
+
+## Question 7
+It is estimated that 4000 of the next 10000 voting residents of Roanoke are against a new sales tax. If 15 eligible voters are selected at random and asked their opinion, what is the probability that at most 7 favor the new tax?
+
+### Solution:
+
+6000 out of 10000 favor the tax, and 4000 are against. This is sampling without replacement, so we use the hypergeometric distribution. Let $X$ be the number who favor the tax. $X \sim \text{Hypergeometric}(N=10000, K=6000, n=15)$. We want $P(X \le 7)$.
+
+```{r}
+# phyper(x, m, n, k) where m=successes in pop, n=failures in pop, k=sample size
+phyper(7, 6000, 4000, 15)
+```
+
+## Question 8
+A company purchases large lots of a certain kind of electronic device. A method is used that rejects a lot if 2 or more defective units are found in a random sample of 100 units.
+
+1. What is the mean number of defective units found in a sample of 100 units if the lot is 1\% defective?
+2. What is the variance?
+3. What is the probability of rejecting 2 of the next 3 lots?
+
+### Solution:
+
+Let $X \sim \text{Binomial}(n=100, p=0.01)$ be the number of defective units in a sample.
+
+**Parts 1 & 2:** Mean $= np$, Variance $= np(1-p)$.
+
+**Part 3:** The probability of rejecting a lot is $P(X \ge 2) = 1 - P(X \le 1)$. The number of rejected lots out of 3 follows a binomial distribution.
+
+```{r}
+n = 100; p = 0.01
+
+# Part 1: Mean
+mu = n * p
+mu
+
+# Part 2: Variance
+variance = n * p * (1 - p)
+variance
+
+# Part 3: P(reject a lot) = P(X >= 2)
+p_reject = 1 - pbinom(1, n, p)
+p_reject
+
+# P(reject exactly 2 of 3 lots)
+dbinom(2, 3, p_reject)
+```
+
+
+## Question 9
+Suppose $X$ follows a continuous uniform distribution from 1 to 5. Determine the conditional probability $P(X>2.5\mid X\le 4).$
+
+### Solution:
+
+By definition of conditional probability:
+$$P(X > 2.5 \mid X \le 4) = \frac{P(2.5 < X \le 4)}{P(X \le 4)}$$
+
+```{r}
+# P(2.5 < X <= 4)
+p_num = punif(4, 1, 5) - punif(2.5, 1, 5)
+
+# P(X <= 4)
+p_den = punif(4, 1, 5)
+
+# Conditional probability
+p_num / p_den
+```
+
+## Question 10
+Find the value of $z$ if the area under a standard normal curve
+
+1. to the right of $z$ is 0.3622
+2. to the left of $z$ is 0.1131
+3. between 0 and $z$ (with $z>0$) is 0.4838
+4. between $-z$ and $z$ (with $z>0$) is 0.95
+
+### Solution:
+
+```{r}
+# Part 1: P(Z > z) = 0.3622, so P(Z <= z) = 1 - 0.3622
+qnorm(1 - 0.3622)
+
+# Part 2: P(Z < z) = 0.1131
+qnorm(0.1131)
+
+# Part 3: P(0 < Z < z) = 0.4838, so P(Z < z) = 0.5 + 0.4838
+qnorm(0.5 + 0.4838)
+
+# Part 4: P(-z < Z < z) = 0.95, so P(Z < z) = (1 + 0.95)/2 = 0.975
+qnorm(0.975)
+```
+
+
+## Question 11
+A fair coin is tossed 400 times. Use the normal approximation to find the probability of obtaining
+
+1. between 185 and 210 heads inclusive.
+2. exactly 205 heads.
+3. fewer than 176 or more than 227 heads.
+
+### Solution:
+
+$X \sim \text{Binomial}(n=400, p=0.5)$. We approximate with $N(\mu = np = 200, \sigma = \sqrt{np(1-p)} = 10)$, using continuity correction.
+
+```{r}
+mu = 400 * 0.5
+sigma = sqrt(400 * 0.5 * 0.5)
+
+# Part 1: P(185 <= X <= 210) approx P(184.5 < Z < 210.5)
+pnorm(210.5, mu, sigma) - pnorm(184.5, mu, sigma)
+
+# Part 2: P(X = 205) approx P(204.5 < Z < 205.5)
+pnorm(205.5, mu, sigma) - pnorm(204.5, mu, sigma)
+
+# Part 3: P(X < 176 or X > 227) approx P(Z < 175.5) + P(Z > 227.5)
+pnorm(175.5, mu, sigma) + (1 - pnorm(227.5, mu, sigma))
+```
+
+## Question 12
+In Blacksburg, the daily consumption of water (in thousands of liters) approximately follows a gamma distribution with $\alpha=2$ and $\beta=3$.
+
+1. If the daily capacity of Blacksburg is 9 thousand liters of water, what is the probability that on any given day the water supply is inadequate?
+2. According to Chebyshev's theorem, there is a probability of at least 3/4 that the water consumption on any given day will fall within what interval?
+
+### Solution:
+
+$X \sim \text{Gamma}(\alpha=2, \beta=3)$. Mean $= \alpha\beta = 6$, Variance $= \alpha\beta^2 = 18$, so $\sigma = \sqrt{18}$.
+
+**Part 1:** $P(X > 9) = 1 - P(X \le 9)$.
+
+**Part 2:** By Chebyshev's theorem, $P(|X - \mu| < k\sigma) \ge 1 - 1/k^2$. For probability $\ge 3/4$, we need $1 - 1/k^2 = 3/4$, so $k = 2$. The interval is $\mu \pm 2\sigma$.
+
+```{r}
+alpha = 2; beta = 3
+
+# Part 1: P(X > 9). In R, pgamma uses rate = 1/beta
+1 - pgamma(9, shape = alpha, rate = 1/beta)
+
+# Part 2: Chebyshev interval with k=2
+mu = alpha * beta
+sigma = sqrt(alpha * beta^2)
+c(mu - 2*sigma, mu + 2*sigma)
+```
+
+## Question 13
+
+The life (in years) of a certain type of electrical switch has an exponential distribution with an average life $\beta=2$. If 100 of these switches are installed in different systems, what is the probability that at most 30 fail during the first year? Solve directly, then use a normal approximation. Discuss the approximation.
+
+### Solution:
+
+First, find the probability a single switch fails within the first year: $P(T \le 1)$ where $T \sim \text{Exp}(\beta=2)$.
+
+Then the number of switches that fail, $X \sim \text{Binomial}(n=100, p)$. We want $P(X \le 30)$.
+
+```{r}
+# Probability a single switch fails in first year
+p = pexp(1, rate = 1/2)
+p
+
+# Direct: P(X <= 30) using binomial
+direct = pbinom(30, 100, p)
+direct
+
+# Normal approximation with continuity correction
+mu = 100 * p
+sigma = sqrt(100 * p * (1-p))
+approx = pnorm(30.5, mu, sigma)
+approx
+
+cat("Direct:", direct, "\nApprox:", approx, "\nDifference:", abs(direct - approx))
+```
+
+The normal approximation is very close to the exact binomial probability because $np$ and $n(1-p)$ are both well above 5, satisfying the conditions for the approximation.
+
+## Question 14
+Average power usage (dB per hour) for a particular company is studied and is known to have a lognormal distribution with parameters $\mu=4$ and $\sigma=2$. What is the probability that the company uses more than 270 dB during any particular hour?
+
+### Solution:
+
+$X \sim \text{LogNormal}(\mu=4, \sigma=2)$. We want $P(X > 270) = 1 - P(X \le 270)$.
+
+```{r}
+1 - plnorm(270, meanlog = 4, sdlog = 2)
+```
+
