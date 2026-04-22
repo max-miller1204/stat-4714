@@ -1,0 +1,37 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{parskip}
+\usepackage{enumitem}
+
+\title{Final Project Proposal}
+\author{STAT 4714}
+\date{April 17, 2026}
+
+\begin{document}
+\maketitle
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Title/Topic:} \emph{Predicting NCAA Men's Basketball Game Margins from Pre-Game Efficiency Ratings.} We will investigate how well pre-game team-strength metrics (KenPom adjusted net efficiency and the NCAA NET ranking) predict the final point margin of a college basketball game, and whether one rating system is a materially better predictor than the other.
+
+  \item \textbf{Team Members:} Max Miller.
+
+  \item \textbf{Motivation:} Basketball betting markets, bracket pools, and selection/seeding committees all rely on composite rating systems, but it is not obvious how much of the noise in game outcomes these ratings actually explain. The problem is a natural fit for this course: game margin is a continuous response, efficiency differentials are continuous predictors, and repeated games give a large sample in which to study sampling variability, fit regression models, and run resampling-based tests. I already maintain a tournament-prediction repository (\texttt{march-madness-analytics}) with the relevant NCAA data scraped, so I can focus my time on the statistical analysis rather than data collection.
+
+  \item \textbf{Course Concepts:}
+  \begin{enumerate}
+    \item \textbf{Distributions (Ch.\ 5--6).} We will model the game-margin distribution and check whether it is approximately Normal after conditioning on rating differential. We will also model the event ``lower-rated team wins'' as a Bernoulli trial and compute the binomial probability of observing at least $k$ upsets in a given number of matchups.
+    \item \textbf{Hypothesis testing / resampling (Ch.\ 8).} We will use a permutation test on the regression slope (under $H_0$: rating differential is unrelated to margin) with $\sim$10{,}000 resamples, and a nonparametric bootstrap to build a 95\% confidence interval for the slope and for the expected margin at a chosen differential.
+    \item \textbf{Linear regression.} We will fit \texttt{margin $\sim$ NetRtg\_diff} and \texttt{margin $\sim$ NETrank\_diff} via ordinary least squares, compare $R^2$ and residual standard error, and check model assumptions with residuals-vs-fitted, Q--Q, and scale--location diagnostic plots. If time permits we will extend to a multiple regression adding home/away/neutral location.
+  \end{enumerate}
+
+  \item \textbf{Data Source:} I will use one of the following two datasets (final choice to be made immediately upon proposal approval; both are already accessible and require no further scraping work to begin analysis):
+  \begin{enumerate}
+    \item \emph{NCAA men's basketball (primary option).} Approximately 2{,}200 regular-season and conference-tournament games from the 2025--26 season, already scraped into \texttt{scraped\_data/tournament\_games.csv} (team, opponent, team/opp NET rank, team/opp score, location, date). Team-level KenPom ratings are in \texttt{scraped\_data/tournament\_teams.csv} (68 tournament teams). Sources: \texttt{kenpom.com} and \texttt{warrennolan.com}.
+    \item \emph{NBA 2025--26 regular season + upcoming playoffs (secondary option).} Game-by-game box scores and team efficiency ratings available via the public \texttt{nba\_api} Python package (endpoints \texttt{leaguegamefinder} and \texttt{leaguedashteamstats}); I will pull team offensive/defensive ratings and $\sim$1{,}200 regular-season games, then optionally append playoff games as they are played during the project window. Source: \texttt{stats.nba.com} via \texttt{nba\_api}.
+  \end{enumerate}
+  The statistical methodology is identical under either dataset; the NCAA option has a larger $n$ and two independent rating systems (KenPom vs NET) to compare, while the NBA option is more current and will include live playoff data.
+
+  \item \textbf{Expected Outcome:} A fitted simple-linear-regression model relating rating differential to final margin, with a bootstrap 95\% CI for the slope and an $R^2$ estimate I expect to fall in the 0.25--0.50 range. I anticipate rejecting the null of zero slope under the permutation test (very small $p$-value). In the NCAA version I expect KenPom NetRtg differential to explain modestly more variance than NET-rank differential; in the NBA version the same methodology will quantify how well regular-season ratings carry into the playoffs. The distributional analysis will yield an empirical estimate of the probability of an upset as a function of rating gap.
+\end{itemize}
+
+\end{document}
