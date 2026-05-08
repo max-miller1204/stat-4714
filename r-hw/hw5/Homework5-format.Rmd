@@ -1,0 +1,343 @@
+---
+title: "Homework 5: Simple Linear Regression"
+author: Max Miller
+date: "May 1, 2026"
+output: pdf_document
+---
+
+```{r}
+set.seed(702)
+knitr::opts_chunk$set(
+  echo = TRUE, message = FALSE, warning = FALSE,
+  fig.width = 8, fig.height = 5
+)
+```
+
+
+
+## Getting Started
+
+The trees dataset contains measurements on 31 black cherry trees, originally published by R. A. Fisher. For each tree, researchers recorded three variables:
+
+1. **Girth**, the diameter of the tree trunk (in inches) measured 4.5 feet above the ground,
+2. **Height**, the total height of the tree (in feet),
+3. **Volume**, an estimated measure of usable timber (in cubic feet).
+
+These variables are a classic example of *allometric* relationships in biology, where size measurements like diameter and height jointly determine biomass or wood volume. We will use this dataset because it provides a natural, real-world setting for learning simple linear regression, model diagnostics, and transformations.
+
+We will use the built-in **`trees`** dataset in R, which contains measurements on 31 black cherry trees.
+
+```{r}
+## DO NOT MODIFY THIS CODE BLOCK
+## load the trees dataset
+data(trees) # you now have the dataset called "trees" in your environment
+summary(trees) # summarize the data
+```
+
+
+
+---
+
+# [8pt] Part A - Exploratory Analysis
+
+Exploratory analyses are essential before model fitting because they reveal the underlying structure, patterns, and anomalies in the data that directly affect how well a statistical model will perform. By visualizing relationships, checking for curvature, identifying outliers, and assessing variability, we avoid using an inappropriate model that could misrepresent the scientific process or lead to misleading conclusions.
+
+Make scatterplots comparing the following variables:
+
+  - `Volume` vs `Girth`
+  - `Volume` vs `Height`
+
+Which variable appears to have a stronger relationship with `Volume`? Does this relationship look linear on the **raw** scale?
+
+#### Solution:
+
+```{r}
+par(mfrow = c(1, 2))
+plot(trees$Girth, trees$Volume,
+     xlab = "Girth (in)", ylab = "Volume (cu ft)",
+     main = "Volume vs Girth", pch = 19, col = "#444444")
+plot(trees$Height, trees$Volume,
+     xlab = "Height (ft)", ylab = "Volume (cu ft)",
+     main = "Volume vs Height", pch = 19, col = "#444444")
+par(mfrow = c(1, 1))
+
+cor(trees$Girth,  trees$Volume)
+cor(trees$Height, trees$Volume)
+```
+
+
+
+`Girth` has the much stronger relationship with `Volume`: the points lie tightly along a clear trend (Pearson correlation $\approx 0.97$), whereas `Height` shows a weaker, noisier association ($\approx 0.60$). On the raw scale the `Volume` vs `Girth` scatter has a slight upward curve, which makes physical sense because volume scales roughly like the square of girth. This suggests a transformation may improve the fit later.
+
+---
+
+# [8pt] Part B - Least Squares Estimation
+
+For the rest of this assignment, we will focus on the relationship between:
+
+$$
+Y = \text{Volume}, \quad X = \text{Girth}.
+$$
+
+1. Compute \(\hat\beta_0\) and \(\hat\beta_1\) manually in R.
+2. Fit the model using `lm(Volume ~ Girth, data = trees)` and verify your calculations.
+
+#### Solution:
+
+Write the least-squares estimates of $\hat\beta_0$ and $\hat\beta_1$ as $b_0$ and $b_1$. From the normal equations,
+$$
+b_1 \;=\; \frac{\sum_{i=1}^n (x_i-\bar x)(y_i-\bar y)}{\sum_{i=1}^n (x_i-\bar x)^2},
+\qquad
+b_0 \;=\; \bar y - b_1\,\bar x.
+$$
+
+```{r}
+x <- trees$Girth
+y <- trees$Volume
+
+## method of least squares estimates
+b1 <- sum((x - mean(x)) * (y - mean(y))) / sum((x - mean(x))^2)
+b0 <- mean(y) - b1 * mean(x)
+c(b0 = b0, b1 = b1)
+
+## verify with lm()
+fit_B <- lm(Volume ~ Girth, data = trees)
+coef(fit_B)
+```
+
+
+
+The manual estimates ($b_0 \approx -36.94$, $b_1 \approx 5.07$) match `lm()` exactly. The fitted regression line is
+$$\hat y = b_0 + b_1\,x \;=\; -36.94 + 5.07\,\text{Girth}.$$
+A one-inch increase in girth is associated with about 5.07 cubic feet more wood volume on average.
+
+---
+
+# [12pt] Part C - Randomization Test for the Slope
+
+We want to test if a linear relationship between `Volume` and `Girth` is statistically significant. We can test this with the following hypotheses:
+
+$$
+H_0 : \beta_1 = 0 \quad\text{vs}\quad H_a : \beta_1 \neq 0.
+$$
+
+Make a decision regarding $H_0$ using the randomization test with $B=5000$ resamples.
+
+#### Solution:
+
+Under $H_0$ there is no relationship between $x_i$ and $y_i$, so we can shuffle the $y$'s relative to the $x$'s arbitrarily. The two-sided p-value is the proportion of randomization slopes at least as extreme (in absolute value) as the observed slope.
+
+```{r}
+set.seed(702)
+
+## observed slope
+fit_obs <- lm(Volume ~ Girth, data = trees)
+b1_obs  <- coef(fit_obs)[2]
+
+## build the null distribution by shuffling y relative to x
+Bnull   <- 5000
+b1_null <- numeric(Bnull)
+for (b in 1:Bnull) {
+  y_perm     <- sample(trees$Volume, replace = FALSE)
+  b1_null[b] <- coef(lm(y_perm ~ trees$Girth))[2]
+}
+
+## two-sided p-value
+p_val <- mean(abs(b1_null) >= abs(b1_obs))
+c(b1_observed = unname(b1_obs), p_value_two_sided = p_val)
+
+hist(b1_null, breaks = 40, col = "grey85", border = "white",
+     main = expression("Randomization null for " * b[1]),
+     xlab = expression(b[1]^"*"),
+     xlim = range(c(b1_null, b1_obs, -b1_obs)))
+abline(v =  b1_obs, col = "#E87722", lwd = 2)
+abline(v = -b1_obs, col = "#E87722", lwd = 2, lty = 2)
+```
+
+
+
+None of the 5000 randomization slopes come anywhere near the observed slope of $\approx 5.07$, so the empirical p-value is $0$ (i.e. $< 1/B = 0.0002$). We reject $H_0$ at any reasonable significance level: there is overwhelming evidence of a linear relationship between `Girth` and `Volume`.
+
+---
+
+# [10pt] Part D - Comparing Simple Linear Models
+
+Compare the following simple linear models by manually computing the coefficient of determination $R^2$:
+
+1. `Volume ~ Girth`
+2. `Volume ~ Height`
+
+#### Solution:
+
+$R^2 = 1 - \mathrm{SSE}/\mathrm{SST}$, where
+$$\mathrm{SST}=\sum_{i=1}^n (y_i-\bar y)^2, \qquad \mathrm{SSE}=\sum_{i=1}^n (y_i-\hat y_i)^2.$$
+
+```{r}
+y    <- trees$Volume
+SST  <- sum((y - mean(y))^2)
+
+fit_g <- lm(Volume ~ Girth,  data = trees)
+fit_h <- lm(Volume ~ Height, data = trees)
+
+SSE_g <- sum(resid(fit_g)^2)
+SSE_h <- sum(resid(fit_h)^2)
+
+R2_g <- 1 - SSE_g / SST
+R2_h <- 1 - SSE_h / SST
+c(R2_Girth = R2_g, R2_Height = R2_h)
+
+## check against summary()
+c(summary(fit_g)$r.squared, summary(fit_h)$r.squared)
+```
+
+
+
+`Girth` explains about 93.5% of the variability in `Volume`, while `Height` explains only about 35.8%. Both manual values agree with `summary()`. Of the two single-predictor models, `Volume ~ Girth` is clearly preferable.
+
+---
+
+# [15pt] Part E - Bootstrap Confidence & Prediction Intervals
+
+Using the `Volume ~ Girth` model, provide a 95\% bootstrap confidence interval for $\mu_{Y|x_0}$ and a 95\% prediction interval for $y_0$ when $x_0=12$. Which interval is wider and why?
+
+#### Solution:
+
+Use the residual bootstrap: for each iteration, build a new response $y^*_i = \hat y_i + e^*_i$ where $e^*_i$ is a randomly drawn observed residual, refit the model on $(\mathbf x, \mathbf y^*)$ to get $b_0^*$ and $b_1^*$, and record:
+
+- the bootstrap mean response $\,b_0^* + b_1^* x_0\,$ for the **CI** on $\mu_{Y\mid x_0}$,
+- that mean plus a new resampled residual $e^*$ for the **PI** on $y_0$.
+
+Percentile intervals are then taken from the two bootstrap distributions.
+
+```{r}
+set.seed(702)
+
+## observed sample
+fit  <- lm(Volume ~ Girth, data = trees)
+ehat <- resid(fit)
+yhat <- fitted(fit)
+n    <- nrow(trees)
+x    <- trees$Girth
+x0   <- 12
+
+## bootstrap sampling distributions
+B       <- 5000
+mu_star <- numeric(B)   # b0* + b1* x0  (for CI on mu_{Y|x0})
+y0_star <- numeric(B)   # b0* + b1* x0 + e*  (for PI on y0)
+for (b in 1:B) {
+  y_star   <- yhat + sample(ehat, n, replace = TRUE)  # resample residuals
+  fit_star <- lm(y_star ~ x)
+  coeff    <- coef(fit_star)
+  mu_x0    <- coeff[1] + coeff[2] * x0
+  e_new    <- sample(ehat, 1, replace = TRUE)         # new noise for prediction
+  mu_star[b] <- mu_x0
+  y0_star[b] <- mu_x0 + e_new
+}
+
+## 95% percentile intervals
+ci_mean <- quantile(mu_star, c(0.025, 0.975))
+pi_y0   <- quantile(y0_star, c(0.025, 0.975))
+ci_mean
+pi_y0
+c(CI_width = unname(diff(ci_mean)), PI_width = unname(diff(pi_y0)))
+```
+
+```{r}
+par(mfrow = c(1, 2))
+hist(mu_star, breaks = 40, col = "grey85", border = "white",
+     main = expression("Bootstrap CI for " * mu[Y * "|" * x[0]]),
+     xlab = expression(b[0]^"*" + b[1]^"*" * x[0]))
+abline(v = ci_mean, col = "#E87722", lwd = 2, lty = 2)
+
+hist(y0_star, breaks = 40, col = "grey85", border = "white",
+     main = expression("Bootstrap PI for " * y[0]),
+     xlab = expression(b[0]^"*" + b[1]^"*" * x[0] + e^"*"))
+abline(v = pi_y0, col = "#E87722", lwd = 2, lty = 2)
+par(mfrow = c(1, 1))
+```
+
+
+
+At $x_0=12$, the 95% bootstrap CI for the mean response $\mu_{Y\mid x_0}$ is approximately $(22.25,\,25.43)$, while the 95% bootstrap PI for a new $y_0$ is approximately $(15.98,\,32.76)$. The prediction interval is much wider (width $\approx 16.8$ vs $\approx 3.2$) because it captures two sources of uncertainty: (1) uncertainty in estimating the regression line itself (the only source for the CI), plus (2) the irreducible noise $e^*$ of an individual observation around the line. The CI shrinks toward the true mean as $n\to\infty$, but the PI does not. PI's width is bounded below by the inherent variability of $Y$.
+
+---
+
+# [15pt] Part F - Transformations and Model Comparison
+
+Which data transformation from Table 11.6 (slide 7.4) provides the best fit to the data? Provide residual plots and Q-Q plots to justify your answer. Try at least **two** transformations.
+
+#### Solution:
+
+Two candidates from Table 11.6 that are natural for `Volume` vs `Girth`:
+
+1. Power model (row: $y = \alpha x^{\beta}$, linearized via $\log y$ vs $\log x$):
+$$\log(\text{Volume}) = \beta_0 + \beta_1 \log(\text{Girth}) + \epsilon.$$
+
+2. Exponential model (row: $y = \alpha e^{\beta x}$, linearized via $\log y$ vs $x$):
+$$\log(\text{Volume}) = \beta_0 + \beta_1 \,\text{Girth} + \epsilon.$$
+
+We compare these to the raw `Volume ~ Girth` model.
+
+"when $y$ is transformed, model comparison should be based on residuals in the metric of the *untransformed* response", we compute $R^2$ on the original Volume scale by back-transforming each model's predictions before forming residuals.
+
+```{r}
+fit_raw   <- lm(Volume      ~ Girth,      data = trees)
+fit_pow   <- lm(log(Volume) ~ log(Girth), data = trees)   # power
+fit_exp   <- lm(log(Volume) ~ Girth,      data = trees)   # exponential
+
+## Predictions back on the original Volume scale
+yhat_raw <- fitted(fit_raw)
+yhat_pow <- exp(fitted(fit_pow))
+yhat_exp <- exp(fitted(fit_exp))
+
+y    <- trees$Volume
+SST  <- sum((y - mean(y))^2)
+R2_orig <- function(yhat) 1 - sum((y - yhat)^2) / SST
+
+c(raw         = R2_orig(yhat_raw),
+  power_loglog= R2_orig(yhat_pow),
+  exponential = R2_orig(yhat_exp))
+
+## Residuals on the original Volume scale (used for diagnostic plots)
+res_raw <- y - yhat_raw
+res_pow <- y - yhat_pow
+res_exp <- y - yhat_exp
+```
+
+```{r}
+par(mfrow = c(3, 2))
+
+plot(yhat_raw, res_raw, pch = 19, col = "#444444",
+     main = "Raw: residuals vs fitted",
+     xlab = "Fitted Volume", ylab = "Residual (orig scale)")
+abline(h = 0, col = "#E87722", lwd = 2)
+qqnorm(res_raw, pch = 19, col = "#444444", main = "Raw: Normal Q-Q")
+qqline(res_raw, col = "#E87722", lwd = 2)
+
+plot(yhat_pow, res_pow, pch = 19, col = "#444444",
+     main = "Power (log-log): residuals vs fitted",
+     xlab = "Fitted Volume", ylab = "Residual (orig scale)")
+abline(h = 0, col = "#E87722", lwd = 2)
+qqnorm(res_pow, pch = 19, col = "#444444", main = "Power (log-log): Normal Q-Q")
+qqline(res_pow, col = "#E87722", lwd = 2)
+
+plot(yhat_exp, res_exp, pch = 19, col = "#444444",
+     main = "Exponential: residuals vs fitted",
+     xlab = "Fitted Volume", ylab = "Residual (orig scale)")
+abline(h = 0, col = "#E87722", lwd = 2)
+qqnorm(res_exp, pch = 19, col = "#444444", main = "Exponential: Normal Q-Q")
+qqline(res_exp, col = "#E87722", lwd = 2)
+
+par(mfrow = c(1, 1))
+```
+
+
+
+**Conclusion.** The raw model has a clear curved pattern in its residual plot (residuals positive at the extremes and negative in the middle), confirming the mild curve we saw in Part A. The exponential model removes some of that pattern but still shows mild fanning at large fitted values. The power (log-log) model is the best fit:
+
+- It has the highest $R^2$ on the original Volume scale ($\approx 0.96$, vs. $0.945$ for the exponential model and $0.935$ for the raw model).
+- Its residuals scatter randomly around zero with no systematic curve.
+- Its Q-Q plot tracks the reference line most closely.
+- The estimated slope $b_1 \approx 2.2$ has a clean physical interpretation: $\text{Volume} \propto \text{Girth}^{2.2}$, very close to the geometric expectation that volume scales like girth-squared.
+
+The exponential transformation is a real improvement over the raw model but is clearly second-best. The raw model isn't optimal.
